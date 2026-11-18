@@ -260,6 +260,16 @@ def _entities(hass: HomeAssistant, issues: list[dict[str, Any]]) -> dict[str, An
                     "Si ce sont des entités inutiles, désactive-les pour alléger Home Assistant."
                 ),
                 entities=ents,
+                actions=[
+                    action(
+                        "disable_entities",
+                        f"Désactiver ces {len(ents)} entités",
+                        {"entity_ids": ents},
+                        confirm=f"Désactiver {len(ents)} entité(s) « {platform} » ? (réactivables dans Paramètres > Entités)",
+                    )
+                ]
+                if sev == INFO
+                else [],
             )
         )
 
@@ -296,6 +306,23 @@ def _automations(hass: HomeAssistant, issues: list[dict[str, Any]]) -> None:
         name = state.attributes.get("friendly_name", auto.entity_id) if state else auto.entity_id
         auto_id = state.attributes.get("id") if state else None
         link = f"/config/automation/edit/{auto_id}" if auto_id else "/config/automation/dashboard"
+        auto_actions = [
+            action(
+                "disable_entity",
+                "Désactiver",
+                {"entity_id": auto.entity_id},
+                confirm=f"Désactiver l'automatisation « {name} » ? (réactivable à tout moment)",
+            )
+        ]
+        if auto_id:
+            auto_actions.append(
+                action(
+                    "delete_automation",
+                    "Supprimer",
+                    {"entity_id": auto.entity_id, "config_id": auto_id},
+                    confirm=f"Supprimer DÉFINITIVEMENT l'automatisation « {name} » ? Cette action est irréversible (sauf restauration d'une sauvegarde).",
+                )
+            )
         if state and state.state == "unavailable":
             issues.append(
                 issue(
@@ -303,8 +330,9 @@ def _automations(hass: HomeAssistant, issues: list[dict[str, Any]]) -> None:
                     CAT_CONFIG,
                     WARNING,
                     f"Automatisation « {name} » hors service",
-                    fix="Elle n'a pas pu se charger (souvent un appareil supprimé). Ouvre-la pour la corriger.",
+                    fix="Elle n'a pas pu se charger (souvent un appareil supprimé). Ouvre-la pour la corriger, ou désactive/supprime-la si tu ne t'en sers plus.",
                     link=link,
+                    actions=auto_actions,
                 )
             )
             continue
@@ -326,8 +354,9 @@ def _automations(hass: HomeAssistant, issues: list[dict[str, Any]]) -> None:
                     WARNING,
                     f"Automatisation « {name} » : référence(s) introuvable(s)",
                     detail=", ".join(missing[:8]),
-                    fix="Remplace ces entités/appareils par ceux qui existent aujourd'hui.",
+                    fix="Remplace ces entités/appareils par ceux qui existent aujourd'hui, ou désactive/supprime l'automatisation.",
                     link=link,
+                    actions=auto_actions,
                 )
             )
 

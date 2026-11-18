@@ -54,6 +54,94 @@ const SUGGESTIONS = [
   "Optimise",
 ];
 
+// Visite guidée : target = sélecteur(s) dans le panneau (séparés par |), tab = onglet à ouvrir avant.
+const TOUR = [
+  {
+    icon: "mdi:robot-happy-outline",
+    title: "Bienvenue dans Majordome 👋",
+    text: "Je suis ton **assistant de maintenance**. Je surveille Home Assistant en permanence, je t'explique les problèmes en français et je te propose de les corriger en un clic.\n\nJe tourne **entièrement chez toi** : aucune IA externe, aucun compte, aucune licence.\n\nUne petite visite ? Ça prend une minute.",
+  },
+  {
+    target: ".ring",
+    icon: "mdi:heart-pulse",
+    title: "Ton score de santé",
+    text: "Une note sur **100**, recalculée toutes les 15 minutes.\n\n- 🟢 85 et plus : tout roule\n- 🟠 60 à 84 : quelques points à regarder\n- 🔴 moins de 60 : il y a du travail\n\nChaque problème critique retire 15 points, chaque avertissement 5.",
+  },
+  {
+    target: '[data-action="scan"]',
+    icon: "mdi:refresh",
+    title: "Analyser maintenant",
+    text: "J'analyse tout seul, mais ce bouton relance une **analyse complète** tout de suite. Pratique après avoir corrigé quelque chose, pour voir le score remonter.",
+  },
+  {
+    target: "#tabs",
+    icon: "mdi:tab",
+    title: "Six onglets",
+    text: "Chaque onglet couvre un domaine. La **pastille rouge** indique combien de points demandent ton attention.\n\nOn les passe en revue ?",
+  },
+  {
+    tab: "assistant",
+    target: ".composer",
+    icon: "mdi:chat-processing-outline",
+    title: "Parle-moi",
+    text: "Pose tes questions en français, comme à une personne :\n\n- « **Fais le bilan** »\n- « **Pourquoi la lampe du salon ne marche pas ?** » : je fais un diagnostic complet de l'appareil\n- « **Allume la cuisine** » : je transmets à Assist, l'assistant local de Home Assistant",
+  },
+  {
+    tab: "assistant",
+    target: ".suggest",
+    icon: "mdi:gesture-tap",
+    title: "Raccourcis",
+    text: "Pas d'idée ? Clique sur une suggestion. Quand ma réponse propose une action (réveiller un appareil, installer un correctif…), un **bouton** apparaît directement dans la conversation.",
+  },
+  {
+    tab: "health",
+    target: ".issue|.ok-card",
+    icon: "mdi:clipboard-check-outline",
+    title: "Santé : chaque problème expliqué",
+    text: "Chaque carte contient :\n\n- la **gravité** (Critique, Attention, Info)\n- ce qui se passe, en clair\n- 💡 **la solution**\n- des **boutons** pour corriger directement (désactiver, supprimer…)\n\n« **Ignorer** » masque un point que tu as choisi de laisser tel quel. Et en haut de chaque onglet, **Tout corriger** applique toutes les corrections sûres d'un coup : il désactive, il ne supprime jamais une automatisation.",
+  },
+  {
+    tab: "updates",
+    target: ".card.update|.ok-card",
+    icon: "mdi:shield-check-outline",
+    title: "Mises à jour sans casse",
+    text: "Chaque mise à jour reçoit un **niveau de risque**. Pour Home Assistant, je lis les notes officielles et je te dis quels changements cassants touchent **tes** intégrations.\n\n« **Tout mettre à jour en sécurité** » installe tout sauf le risque élevé, une par une : sauvegarde → installation → vérification, arrêt au premier problème.\n\n« **Mises à jour automatiques** » : choisis ce qui se met à jour tout seul la nuit.",
+  },
+  {
+    tab: "zigbee",
+    target: ".scroll|.tiles",
+    icon: "mdi:zigbee",
+    title: "Ton réseau Zigbee",
+    text: "Tous tes appareils Zigbee2MQTT et ZHA : **en ligne ou non**, qualité du signal, piles, dernier message.\n\n« **Réveiller** » interroge un appareil, « **Reconfig.** » le reconfigure sans le réappairer.",
+  },
+  {
+    tab: "zigbee",
+    target: "h3 + .card",
+    icon: "mdi:dog-side",
+    title: "Le chien de garde",
+    text: "À chaque fois qu'une lampe ou une prise Zigbee reçoit un ordre, je vérifie **6 secondes plus tard** qu'elle a obéi.\n\nSinon je **renvoie la commande**, je tente de la réveiller, et je te préviens si elle reste muette. Fini la lampe qui ne s'allume pas sans raison.",
+  },
+  {
+    tab: "logs",
+    target: ".issue|.ok-card",
+    icon: "mdi:text-box-search-outline",
+    title: "Le journal, traduit",
+    text: "Au lieu de 200 lignes d'erreurs techniques, je **regroupe par cause** (réseau, DNS, Zigbee, base de données…) et je t'explique quoi faire.\n\n« Voir les messages » affiche les lignes d'origine.",
+  },
+  {
+    tab: "optimize",
+    target: ".tiles",
+    icon: "mdi:tune-variant",
+    title: "Optimisation",
+    text: "Taille de la base, disque libre, dernière sauvegarde, entités fantômes, capteurs trop bavards, automatisations cassées, appareils bannis…\n\nTout ce qui ralentit ou fragilise Home Assistant, avec le correctif.",
+  },
+  {
+    icon: "mdi:party-popper",
+    title: "Tu es prêt !",
+    text: "Quelques bonus :\n\n- 🔔 Je t'envoie une **notification** quand un problème critique apparaît\n- 📊 Ajoute la carte **custom:majordome-card** à ton tableau de bord\n- ⚙️ Réglages : Paramètres › Appareils et services › Majordome › **Configurer** (notification sur téléphone, correctifs automatiques la nuit…)\n\nPour revoir cette visite, clique sur **?** en haut à droite.",
+  },
+];
+
 const store = {
   get(k, d) { try { const v = localStorage.getItem("majordome." + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem("majordome." + k, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } },
@@ -99,7 +187,11 @@ class MajordomePanel extends HTMLElement {
   set panel(p) { this._panel = p; }
   set route(r) { this._route = r; }
 
-  disconnectedCallback() { clearInterval(this._timer); }
+  disconnectedCallback() {
+    clearInterval(this._timer);
+    if (this._onKey) window.removeEventListener("keydown", this._onKey);
+    if (this._onResize) window.removeEventListener("resize", this._onResize);
+  }
 
   async _load(scan = false) {
     try {
@@ -132,9 +224,14 @@ class MajordomePanel extends HTMLElement {
         <button class="btn" data-action="scan" title="Relancer une analyse complète">
           <ha-icon icon="mdi:refresh"></ha-icon><span class="hide-narrow">Analyser</span>
         </button>
+        <button class="btn icon-only" data-action="tour" title="Visite guidée" aria-label="Visite guidée">
+          <ha-icon icon="mdi:help-circle-outline"></ha-icon>
+        </button>
       </div>
       <nav id="tabs"></nav>
       <main id="body"></main>
+      <div id="tour" hidden></div>
+      <div id="modal" hidden></div>
       <div id="toast" class="toast"></div>`;
     const menu = this.shadowRoot.querySelector("ha-menu-button");
     menu.hass = this._hass;
@@ -143,8 +240,121 @@ class MajordomePanel extends HTMLElement {
     this.shadowRoot.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" && ev.target.id === "chat-input") { ev.preventDefault(); this._send(); }
     });
+    this._onKey = (ev) => {
+      if (this._tourStep == null || ev.repeat) return;
+      const now = Date.now();
+      if (now - (this._lastTourKey || 0) < 350) return;
+      this._lastTourKey = now;
+      if (ev.key === "Escape") this._endTour();
+      else if (ev.key === "ArrowRight") this._showStep(this._tourStep + 1);
+      else if (ev.key === "ArrowLeft") this._showStep(this._tourStep - 1);
+    };
+    this._onResize = () => this._positionTour();
+    window.addEventListener("keydown", this._onKey);
+    window.addEventListener("resize", this._onResize);
     this._renderTabs();
     this._renderBody();
+    if (!store.get("tour_done", false)) setTimeout(() => this._startTour(), 1200);
+  }
+
+  // ------------------------------------------------------------- visite guidée
+  _startTour() {
+    this._tourReturnTab = this._tab;
+    this._showStep(0);
+  }
+
+  _endTour() {
+    const t = this.shadowRoot.getElementById("tour");
+    t.hidden = true;
+    t.innerHTML = "";
+    this._tourStep = null;
+    store.set("tour_done", true);
+    if (this._tourReturnTab && this._tourReturnTab !== this._tab) {
+      this._tab = this._tourReturnTab;
+      this._renderTabs();
+      this._renderBody();
+    }
+  }
+
+  _showStep(i) {
+    if (i < 0) return;
+    if (i >= TOUR.length) { this._endTour(); return; }
+    this._tourStep = i;
+    const step = TOUR[i];
+    if (step.tab && step.tab !== this._tab) {
+      this._tab = step.tab;
+      this._renderTabs();
+      this._renderBody();
+    }
+    const t = this.shadowRoot.getElementById("tour");
+    const last = i === TOUR.length - 1;
+    t.hidden = false;
+    t.innerHTML = `
+      <div class="tour-spot" id="tour-spot"></div>
+      <div class="tour-pop" id="tour-pop" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+        <div class="tour-top">
+          <span class="tour-count">${i + 1} / ${TOUR.length}</span>
+          <button class="tour-x" data-tour="skip" aria-label="Fermer la visite">✕</button>
+        </div>
+        ${step.icon ? `<div class="tour-icon"><ha-icon icon="${step.icon}"></ha-icon></div>` : ""}
+        <h2 id="tour-title">${esc(step.title)}</h2>
+        <div class="tour-text">${md(step.text)}</div>
+        <div class="tour-dots">${TOUR.map((_, k) => `<span class="${k === i ? "on" : ""}"></span>`).join("")}</div>
+        <div class="tour-nav">
+          ${i > 0 ? `<button class="btn" data-tour="prev">Précédent</button>` : `<button class="btn ghost" data-tour="skip">Passer</button>`}
+          <button class="btn primary" data-tour="next">${last ? "C'est parti !" : "Suivant"}</button>
+        </div>
+      </div>`;
+    const target = this._tourTarget();
+    if (target) target.scrollIntoView({ block: "center", behavior: "instant" });
+    requestAnimationFrame(() => this._positionTour());
+    setTimeout(() => this._positionTour(), 250);
+    const next = this.shadowRoot.querySelector('[data-tour="next"]');
+    if (next) next.focus({ preventScroll: true });
+  }
+
+  _tourTarget() {
+    if (this._tourStep == null) return null;
+    const sel = TOUR[this._tourStep].target;
+    if (!sel) return null;
+    for (const s of sel.split("|")) {
+      const el = this.shadowRoot.querySelector(s.trim());
+      if (el && el.getBoundingClientRect().width > 0) return el;
+    }
+    return null;
+  }
+
+  _positionTour() {
+    if (this._tourStep == null) return;
+    const spot = this.shadowRoot.getElementById("tour-spot");
+    const pop = this.shadowRoot.getElementById("tour-pop");
+    if (!spot || !pop) return;
+    const target = this._tourTarget();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (!target) {
+      spot.className = "tour-spot full";
+      spot.removeAttribute("style");
+      pop.className = "tour-pop center";
+      pop.removeAttribute("style");
+      return;
+    }
+    const r = target.getBoundingClientRect();
+    const pad = 6;
+    spot.className = "tour-spot";
+    spot.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px;`;
+    pop.className = "tour-pop";
+    pop.removeAttribute("style");
+    if (vw < 600) { pop.className = "tour-pop sheet"; return; }
+    const pw = pop.offsetWidth;
+    const ph = pop.offsetHeight;
+    const gap = 14;
+    let top = r.bottom + gap;
+    if (top + ph > vh - 12) top = r.top - ph - gap;
+    if (top < 12) top = Math.max(12, Math.min(vh - ph - 12, r.top + r.height / 2 - ph / 2));
+    let left = r.left + r.width / 2 - pw / 2;
+    left = Math.max(12, Math.min(vw - pw - 12, left));
+    pop.style.cssText = `top:${top}px;left:${left}px;`;
   }
 
   _renderTabs() {
@@ -184,6 +394,7 @@ class MajordomePanel extends HTMLElement {
     const body = this.shadowRoot.getElementById("body");
     if (!body) return;
     const r = this._report;
+    if (this._tourStep != null) requestAnimationFrame(() => this._positionTour());
     if (this._tab === "assistant") { body.innerHTML = this._assistantHtml(); this._scrollChat(); return; }
     if (!r || r.score == null) {
       body.innerHTML = `<div class="empty"><ha-icon icon="mdi:timer-sand"></ha-icon><p>Première analyse en cours… (moins d'une minute)</p></div>`;
@@ -221,6 +432,66 @@ class MajordomePanel extends HTMLElement {
             data-confirm="Ne plus afficher ce point ?">Ignorer</button>
         </div>
       </div>`;
+  }
+
+  _fixAllBar(issues, label) {
+    const fixable = issues.filter((i) => i.autofix);
+    if (!fixable.length) return "";
+    const lines = fixable.map((i) => `• ${i.title}\n   → ${i.autofix.label}`).join("\n");
+    const confirm = `${label} : ${fixable.length} correction(s) vont être appliquées.\n\n${lines}\n\nLes automatisations et intégrations sont seulement désactivées (réactivables). Seuls les vieux fichiers de base corrompus et les entités fantômes sont supprimés. Continuer ?`;
+    return `
+      <div class="card fixall">
+        <ha-icon icon="mdi:auto-fix"></ha-icon>
+        <div class="grow"><b>${fixable.length} point(s) corrigeable(s) automatiquement</b>
+          <div class="muted">${fixable.slice(0, 4).map((i) => esc(i.autofix.label)).join(" · ")}${fixable.length > 4 ? " …" : ""}</div></div>
+        <button class="btn primary" data-action="fix_all" data-params="${esc(JSON.stringify({ ids: fixable.map((i) => i.id) }))}"
+          data-confirm="${esc(confirm)}"><ha-icon icon="mdi:auto-fix"></ha-icon>${esc(label)}</button>
+      </div>`;
+  }
+
+  _openAutoConfig() {
+    const policies = (this._report && this._report.auto_update) || {};
+    const ents = Object.values(this._hass.states)
+      .filter((s) => s.entity_id.startsWith("update."))
+      .map((s) => ({ id: s.entity_id, title: s.attributes.title || s.attributes.friendly_name || s.entity_id, on: s.state === "on", v: s.attributes.installed_version }))
+      .sort((a, b) => a.title.localeCompare(b.title, "fr"));
+    const opt = (id, val, label) => `<label class="seg-opt"><input type="radio" name="${esc(id)}" value="${val}" ${((policies[id] || "off") === val) ? "checked" : ""}/><span>${label}</span></label>`;
+    const m = this.shadowRoot.getElementById("modal");
+    m.hidden = false;
+    m.innerHTML = `
+      <div class="modal-back" data-modal="close"></div>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="tour-top"><h2 id="modal-title">Mises à jour automatiques</h2><button class="tour-x" data-modal="close" aria-label="Fermer">✕</button></div>
+        <p class="muted">Chaque nuit entre <b>3 h et 5 h</b>, Majordome installe ce que tu autorises ici : sauvegarde avant, vérification après, arrêt au premier problème et notification du résultat.</p>
+        <div class="modal-tools">
+          <span class="muted">Tout régler sur :</span>
+          <button class="chip-btn" data-modal="all" data-val="off">Jamais</button>
+          <button class="chip-btn" data-modal="all" data-val="patch">Correctifs</button>
+          <button class="chip-btn" data-modal="all" data-val="safe">Sans risque élevé</button>
+        </div>
+        <div class="modal-list">
+          ${ents.map((e) => `
+            <div class="modal-row">
+              <div class="grow"><b>${esc(e.title)}</b><div class="muted">${esc(e.v || "")}${e.on ? " · mise à jour dispo" : ""}</div></div>
+              <div class="seg small">${opt(e.id, "off", "Jamais")}${opt(e.id, "patch", "Correctifs")}${opt(e.id, "safe", "Sans risque élevé")}</div>
+            </div>`).join("")}
+        </div>
+        <p class="muted small-note"><b>Correctifs</b> : seulement les petites versions (ex. 1.2.3 → 1.2.4). <b>Sans risque élevé</b> : aussi les versions mineures, jamais les majeures ni celles avec changements cassants.</p>
+        <div class="tour-nav"><button class="btn" data-modal="close">Annuler</button><button class="btn primary" data-modal="save">Enregistrer</button></div>
+      </div>`;
+  }
+
+  async _saveAutoConfig() {
+    const m = this.shadowRoot.getElementById("modal");
+    const policies = {};
+    m.querySelectorAll('input[type="radio"]:checked').forEach((i) => { policies[i.name] = i.value; });
+    try {
+      const res = await this._hass.callWS({ type: "majordome/action", action: "set_auto_update", params: { policies } });
+      this._toast(res.message);
+    } catch (e) { this._toast("Erreur : " + (e.message || e), false); }
+    m.hidden = true;
+    m.innerHTML = "";
+    await this._load();
   }
 
   _issuesList(issues, emptyText) {
@@ -293,6 +564,7 @@ class MajordomePanel extends HTMLElement {
         <div class="tile"><div class="big" style="color:${SEV.info.color}">${info}</div><div class="muted">Infos</div></div>
       </div>
       <div class="muted small-line">Dernière analyse : ${esc(when)}${r.ignored_count ? ` · ${r.ignored_count} point(s) ignoré(s) <a href="#" data-action="unignore_all" data-confirm="Réafficher les points ignorés ?">réafficher</a>` : ""}</div>
+      ${this._fixAllBar(r.issues, "Tout corriger")}
       ${this._issuesList(r.issues, "Aucun problème détecté. Ta maison est en pleine forme !")}`;
   }
 
@@ -300,6 +572,8 @@ class MajordomePanel extends HTMLElement {
   _updatesHtml(r) {
     const ups = r.updates || [];
     const safe = ups.filter((u) => u.risk === "low" && u.can_install);
+    const medium = ups.filter((u) => u.risk === "medium" && u.can_install);
+    const high = ups.filter((u) => u.risk === "high" || u.risk === "blocked");
     const hist = r.update_history || [];
     const cards = ups.map((u) => {
       const risk = RISK[u.risk] || RISK.medium;
@@ -332,9 +606,20 @@ class MajordomePanel extends HTMLElement {
     const verdictColor = { ok: "var(--success-color,#43a047)", "régression": "var(--error-color,#db4437)" };
     return `
       <div class="bar">
-        <div><b>${ups.length}</b> mise(s) à jour · <b>${safe.length}</b> sans risque</div>
-        ${safe.length ? `<button class="btn primary" data-action="update_all_safe" data-params="{}" data-confirm="Sauvegarde puis installation des ${safe.length} correctifs sans risque, avec vérification après chacun. Continuer ?">Installer les ${safe.length} correctifs sûrs</button>` : ""}
+        <div><b>${ups.length}</b> mise(s) à jour · <b>${safe.length}</b> correctif(s) sans risque · <b>${medium.length}</b> à risque moyen</div>
+        <button class="btn" data-action="auto_config"><ha-icon icon="mdi:calendar-sync"></ha-icon>Mises à jour automatiques</button>
       </div>
+      ${safe.length || medium.length ? `<div class="card fixall">
+        <ha-icon icon="mdi:shield-sync-outline"></ha-icon>
+        <div class="grow"><b>Tout mettre à jour en sécurité</b>
+          <div class="muted">Une par une : sauvegarde → installation → vérification 60 s. Arrêt automatique au premier problème. Les mises à jour à risque élevé sont exclues : lis leurs notes d'abord.</div></div>
+        <div class="actions">
+          ${safe.length ? `<button class="btn" data-action="update_all_safe" data-params='${esc(JSON.stringify({ level: "low" }))}'
+            data-confirm="${esc(`Installer les ${safe.length} correctif(s) sans risque ?\n\n` + safe.map((u) => "• " + u.title + " " + u.latest).join("\n"))}">Correctifs seulement (${safe.length})</button>` : ""}
+          <button class="btn primary" data-action="update_all_safe" data-params='${esc(JSON.stringify({ level: "medium" }))}'
+            data-confirm="${esc(`Installer ${safe.length + medium.length} mise(s) à jour, une par une, avec sauvegarde et vérification ?\n\n` + [...safe, ...medium].map((u) => "• " + u.title + " " + u.latest).join("\n") + (high.length ? `\n\nExclues (risque élevé) :\n` + high.map((u) => "• " + u.title).join("\n") : ""))}">Tout mettre à jour en sécurité (${safe.length + medium.length})</button>
+        </div>
+      </div>` : ""}
       ${cards.length ? cards.join("") : `<div class="card ok-card"><ha-icon icon="mdi:check-circle"></ha-icon> Tout est à jour.</div>`}
       ${hist.length ? `<h3>Historique Majordome</h3>
         <div class="card"><table><tr><th>Date</th><th>Élément</th><th>Version</th><th>Sauvegarde</th><th>Vérification</th></tr>
@@ -364,6 +649,7 @@ class MajordomePanel extends HTMLElement {
         <div class="tile"><div class="big">${s.channel ?? "—"}</div><div class="muted">Canal</div></div>
       </div>
       ${s.coordinator_type ? `<div class="muted small-line">Dongle : ${esc(s.coordinator_type)} · firmware ${esc(s.coordinator_revision || "?")}${s.zha ? ` · ZHA : ${esc(s.zha_state)}` : ""}</div>` : ""}
+      ${this._fixAllBar(issues, "Tout corriger le Zigbee")}
       ${this._issuesList(issues, "Réseau Zigbee en bonne santé.")}
       <div class="bar">
         <div class="seg">
@@ -395,7 +681,8 @@ class MajordomePanel extends HTMLElement {
   _logsHtml(r) {
     const groups = r.logs || [];
     if (!groups.length) return `<div class="card ok-card"><ha-icon icon="mdi:check-circle"></ha-icon> Journal propre depuis le dernier démarrage.</div>`;
-    return groups.map((g) => {
+    const logIssues = r.issues.filter((i) => i.category === "logs");
+    return this._fixAllBar(logIssues, "Tout corriger") + groups.map((g) => {
       const sev = SEV[g.severity] || SEV.info;
       return `
         <div class="card issue" style="--sev:${sev.color}">
@@ -425,6 +712,7 @@ class MajordomePanel extends HTMLElement {
         <div class="tile"><div class="big">${sys.orphans ?? 0}</div><div class="muted">Entités fantômes</div></div>
       </div>
       <div class="actions top"><button class="btn" data-action="backup_now" data-params="{}" data-confirm="Lancer une sauvegarde complète maintenant ?">Sauvegarder maintenant</button></div>
+      ${this._fixAllBar(issues, "Tout optimiser")}
       ${this._issuesList(issues, "Configuration propre, rien à optimiser.")}
       ${chatty.length ? `<h3>Capteurs qui écrivent le plus dans l'historique (24 h)</h3>
         <div class="card"><table><tr><th>Entité</th><th>Écritures / jour</th></tr>
@@ -433,6 +721,24 @@ class MajordomePanel extends HTMLElement {
 
   // ----------------------------------------------------------------- events
   async _onClick(ev) {
+    const tour = ev.target.closest("[data-tour]");
+    if (tour) {
+      const k = tour.dataset.tour;
+      if (k === "next") this._showStep(this._tourStep + 1);
+      else if (k === "prev") this._showStep(this._tourStep - 1);
+      else this._endTour();
+      return;
+    }
+    if (this._tourStep != null) return; // pendant la visite, on ne déclenche rien d'autre
+    const mod = ev.target.closest("[data-modal]");
+    if (mod) {
+      const k = mod.dataset.modal;
+      const m = this.shadowRoot.getElementById("modal");
+      if (k === "close") { m.hidden = true; m.innerHTML = ""; }
+      else if (k === "save") this._saveAutoConfig();
+      else if (k === "all") m.querySelectorAll(`input[value="${mod.dataset.val}"]`).forEach((i) => { i.checked = true; });
+      return;
+    }
     const tab = ev.target.closest("[data-tab]");
     if (tab) { this._tab = tab.dataset.tab; store.set("tab", this._tab); this._renderTabs(); this._renderBody(); return; }
     const zf = ev.target.closest("[data-zfilter]");
@@ -446,6 +752,8 @@ class MajordomePanel extends HTMLElement {
     let params = {};
     try { params = JSON.parse(el.dataset.params || "{}"); } catch (e) { /* ignore */ }
 
+    if (act === "tour") { this._startTour(); return; }
+    if (act === "auto_config") { this._openAutoConfig(); return; }
     if (act === "send") return this._send();
     if (act === "clear_chat") { this._chat = []; store.set("chat", []); this._renderBody(); return; }
     if (act === "open") { this._navigate(params.path); return; }
@@ -594,6 +902,57 @@ tr:last-child td { border-bottom:none; }
   font-size:14px; transition: transform .25s ease; z-index:10; max-width: calc(100vw - 32px); }
 .toast.show { transform: translate(-50%, 0); }
 .toast.ko { background: var(--error-color, #db4437); }
+.btn.icon-only { padding:7px; }
+.fixall { display:flex; align-items:center; gap:12px; flex-wrap:wrap; border:1px solid color-mix(in srgb, var(--primary-color) 40%, transparent);
+  background: color-mix(in srgb, var(--primary-color) 7%, var(--card-background-color)); }
+.fixall > ha-icon { --mdc-icon-size:28px; color: var(--primary-color); }
+.fixall .actions { margin-top:0; }
+#modal { position:fixed; inset:0; z-index:21; }
+#modal[hidden] { display:none; }
+.modal-back { position:absolute; inset:0; background: rgba(0,0,0,.55); }
+.modal-card { position:absolute; left:50%; top:50%; transform: translate(-50%,-50%); width:min(720px, calc(100vw - 24px));
+  max-height: calc(100vh - 32px); display:flex; flex-direction:column; background: var(--card-background-color);
+  color: var(--primary-text-color); border-radius:16px; padding:16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,.45); box-sizing:border-box; }
+.modal-card h2 { margin:0; font-size:18px; font-weight:600; }
+.modal-tools { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0 8px; }
+.modal-list { overflow-y:auto; flex:1; border-top:1px solid var(--divider-color); border-bottom:1px solid var(--divider-color); margin-bottom:8px; }
+.modal-row { display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px solid var(--divider-color); flex-wrap:wrap; }
+.modal-row:last-child { border-bottom:none; }
+.seg.small { flex:none; }
+.seg-opt { position:relative; }
+.seg-opt input { position:absolute; opacity:0; pointer-events:none; }
+.seg-opt span { display:inline-block; padding:5px 10px; font-size:12px; cursor:pointer; }
+.seg-opt input:checked + span { background: var(--primary-color); color: var(--text-primary-color, #fff); }
+.seg-opt input:focus-visible + span { outline:2px solid var(--primary-color); outline-offset:-2px; }
+.small-note { font-size:12px; }
+#tour { position:fixed; inset:0; z-index:20; }
+#tour[hidden] { display:none; }
+.tour-spot { position:fixed; border-radius:14px; box-shadow: 0 0 0 9999px rgba(0,0,0,.62), 0 0 0 3px var(--primary-color);
+  transition: left .3s ease, top .3s ease, width .3s ease, height .3s ease; pointer-events:none; }
+.tour-spot.full { inset:0; border-radius:0; background: rgba(0,0,0,.62); box-shadow:none; transition:none; }
+.tour-pop { position:fixed; width:min(380px, calc(100vw - 24px)); box-sizing:border-box; background: var(--card-background-color);
+  color: var(--primary-text-color); border-radius:16px; padding:16px 18px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  animation: pop-in .22s ease; max-height: calc(100vh - 24px); overflow:auto; }
+.tour-pop.center { left:50%; top:50%; transform: translate(-50%, -50%); width:min(440px, calc(100vw - 24px)); animation:none; }
+.tour-pop.sheet { left:12px; right:12px; bottom:12px; width:auto; }
+@keyframes pop-in { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+.tour-top { display:flex; justify-content:space-between; align-items:center; }
+.tour-count { font-size:12px; color: var(--secondary-text-color); font-weight:500; }
+.tour-x { border:none; background:none; color: var(--secondary-text-color); font-size:16px; cursor:pointer; padding:4px 6px; border-radius:6px; }
+.tour-x:hover { background: var(--secondary-background-color); }
+.tour-icon { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; margin:6px 0 4px;
+  background: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color); }
+.tour-icon ha-icon { --mdc-icon-size:26px; }
+.tour-pop h2 { font-size:18px; font-weight:600; margin:8px 0 6px; }
+.tour-text { font-size:14px; line-height:1.5; }
+.tour-text p { margin:0 0 8px; }
+.tour-text ul { margin:0 0 8px; padding-left:18px; }
+.tour-text li { margin:2px 0; }
+.tour-dots { display:flex; gap:5px; justify-content:center; margin:12px 0 10px; flex-wrap:wrap; }
+.tour-dots span { width:6px; height:6px; border-radius:50%; background: var(--divider-color); transition: width .2s; }
+.tour-dots span.on { background: var(--primary-color); width:16px; border-radius:3px; }
+.tour-nav { display:flex; justify-content:space-between; gap:8px; }
+@media (prefers-reduced-motion: reduce) { .tour-spot { transition:none; } .tour-pop { animation:none; } }
 @media (max-width: 600px) {
   main { padding: 12px; }
   .hide-narrow { display:none; }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 DOMAIN = "majordome"
-VERSION = "0.1.1"
+VERSION = "0.2.0"
 
 PANEL_URL = "majordome"
 PANEL_TITLE = "Majordome"

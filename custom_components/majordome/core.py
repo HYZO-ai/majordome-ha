@@ -35,6 +35,7 @@ from .const import (
     DEFAULT_WATCHDOG,
     DEFAULT_Z2M_TOPIC,
     RISK_LOW,
+    RISK_MEDIUM,
     SEVERITY_ORDER,
     SEVERITY_PENALTY,
     SIGNAL_REPORT_UPDATED,
@@ -49,6 +50,35 @@ _LOGGER = logging.getLogger(__name__)
 
 VERIFY_DELAY_NO_RESTART = 90  # s
 VERIFY_DELAY_AFTER_START = 240  # s
+
+
+# Actions sûres pour « Tout corriger » : réversibles, jamais de suppression d'automatisation.
+BULK_SAFE = (
+    "disable_entity",
+    "disable_entities",
+    "remove_entities",
+    "delete_corrupt_db",
+    "z2m_options",
+    "z2m_ping",
+    "set_dns",
+    "backup_now",
+    "update_all_safe",
+    "unban_local",
+    "disable_entry",
+    "z2m_restart",
+)
+
+
+def _assign_autofix(item: dict[str, Any]) -> None:
+    """Choisit l'action appliquée par « Tout corriger » pour un problème."""
+    if "autofix" in item:
+        return
+    acts = item.get("actions", [])
+    if item["id"].startswith("entry_"):
+        wanted = "disable_entry" if "non chargée" in item["title"] else "reload_entry"
+        item["autofix"] = next((a for a in acts if a["action"] == wanted), None)
+        return
+    item["autofix"] = next((a for a in acts if a["action"] in BULK_SAFE), None)
 
 
 class Majordome:
@@ -74,6 +104,7 @@ class Majordome:
         self._scan_lock = asyncio.Lock()
         self._update_lock = asyncio.Lock()
         self.busy: str | None = None
+        self._bulk_running = False
 
     # ---------------------------------------------------------------- options
     def opt(self, key: str, default: Any) -> Any:
@@ -157,6 +188,8 @@ class Majordome:
             issues += self._watchdog_issues()
             issues += self._update_history_issues()
 
+            for i in issues:
+                _assign_autofix(i)
             ignored = set(self.data.get("ignored", []))
             visible = [i for i in issues if i["id"] not in ignored]
             visible.sort(key=lambda i: (SEVERITY_ORDER.get(i["severity"], 9), i["category"], i["title"]))
@@ -167,6 +200,7 @@ class Majordome:
 
             zigbee["incidents"] = list(reversed(self.data.get("incidents", [])[-40:]))
             self.report = {
+                "auto_update": self.auto_update_policies(),
                 "generated": dt_util.utcnow().isoformat(),
                 "score": score,
                 "issues": visible,
@@ -318,7 +352,7 @@ class Majordome:
                 return True
         return False
 
-    async def async_safe_update(self, entity_id: str) -> dict[str, Any]:
+    async def async_safe_update(self, entity_id: str, schedule_verify: bool = True) -> dict[str, Any]:
         """Sauvegarde → installation → vérification (ou programmation de la vérification)."""
         async with self._update_lock:
             state = self.hass.states.get(entity_id)
@@ -365,15 +399,17 @@ class Majordome:
                     self.data.setdefault("pending_checks", []).append(key)
                     msg = f"{title} installé ({installed} → {latest}). Un redémarrage est nécessaire ; Majordome vérifiera tout au redémarrage."
                 else:
-                    async_call_later(self.hass, VERIFY_DELAY_NO_RESTART, self._make_verifier(key))
+                    if schedule_verify:
+                        async_call_later(self.hass, VERIFY_DELAY_NO_RESTART, self._make_verifier(key))
                     msg = f"{title} installé ({installed} → {latest}). Vérification automatique dans 90 s."
                 self.async_save_delayed()
-                return {"ok": True, "message": msg, "needs_restart": needs_restart}
+                return {"ok": True, "message": msg, "needs_restart": needs_restart, "key": key, "title": title}
             except Exception as err:  # noqa: BLE001
                 _LOGGER.exception("Mise à jour de %s en échec", entity_id)
                 return {"ok": False, "message": f"Échec de la mise à jour : {err}"}
             finally:
-                self.busy = None
+                if not self._bulk_running:
+                    self.busy = None
                 async_dispatcher_send(self.hass, SIGNAL_REPORT_UPDATED)
 
     def _make_verifier(self, key: str):
@@ -382,10 +418,10 @@ class Majordome:
 
         return _verify
 
-    async def _async_verify_update(self, key: str) -> None:
+    async def _async_verify_update(self, key: str, rescan: bool = True) -> str | None:
         record = next((h for h in self.data.get("update_history", []) if h["key"] == key), None)
         if record is None:
-            return
+            return None
         verdict, details = self._compare(record.get("before", {"failing": [], "unavailable": {}}), self._snapshot())
         record["verdict"] = verdict
         record["details"] = details
@@ -399,44 +435,112 @@ class Majordome:
                 details + " Ouvre Majordome pour revenir en arrière.",
                 f"majordome_regression_{record['entity_id']}",
             )
-        await self.async_scan()
+        if rescan:
+            await self.async_scan()
+        return verdict
 
     async def _async_run_pending_checks(self) -> None:
         for key in list(self.data.get("pending_checks", [])):
             await self._async_verify_update(key)
 
-    async def async_update_all_safe(self) -> dict[str, Any]:
-        safe = [u for u in self.report.get("updates", []) if u["risk"] == RISK_LOW and u["can_install"]]
-        if not safe:
-            return {"ok": True, "message": "Aucun correctif sûr à installer."}
-        done, failed = [], []
-        for upd in safe:
-            res = await self.async_safe_update(upd["entity_id"])
-            (done if res.get("ok") else failed).append(upd["title"])
-        msg = f"Installé : {', '.join(done) or 'rien'}."
+    def _update_candidates(self, level: str) -> list[dict[str, Any]]:
+        """Mises à jour installables : 'low' = correctifs, 'medium' = sans risque élevé."""
+        allowed = {RISK_LOW} if level == "low" else {RISK_LOW, RISK_MEDIUM}
+        items = [
+            u for u in self.report.get("updates", [])
+            if u["risk"] in allowed and u["can_install"] and not u["in_progress"]
+        ]
+        # Home Assistant Core / OS en dernier : leur installation redémarre tout
+        items.sort(key=lambda u: u["source"] in ("core", "os", "supervisor"))
+        return items
+
+    async def async_update_all_safe(self, level: str = "low") -> dict[str, Any]:
+        items = self._update_candidates(level)
+        if not items:
+            return {"ok": True, "message": "Rien à installer à ce niveau de risque."}
+        if self._bulk_running:
+            return {"ok": False, "message": "Des mises à jour sont déjà en cours."}
+        self.hass.async_create_background_task(self._async_bulk_update(items), "majordome_bulk_update")
+        names = ", ".join(u["title"] for u in items)
+        return {
+            "ok": True,
+            "message": f"{len(items)} mise(s) à jour lancée(s) en arrière-plan, une par une avec vérification : {names}. Tu recevras une notification à la fin.",
+        }
+
+    async def _async_bulk_update(self, items: list[dict[str, Any]]) -> None:
+        """Installe une liste de mises à jour et s'arrête au premier problème détecté."""
+        self._bulk_running = True
+        done: list[str] = []
+        failed: list[str] = []
+        restart: list[str] = []
+        stopped: str | None = None
+        try:
+            for idx, upd in enumerate(items, 1):
+                self.busy = f"Mises à jour {idx}/{len(items)} : {upd['title']}"
+                async_dispatcher_send(self.hass, SIGNAL_REPORT_UPDATED)
+                res = await self.async_safe_update(upd["entity_id"], schedule_verify=False)
+                if not res.get("ok"):
+                    failed.append(upd["title"])
+                    continue
+                if res.get("needs_restart"):
+                    restart.append(upd["title"])
+                    continue
+                self.busy = f"Vérification après {upd['title']}…"
+                async_dispatcher_send(self.hass, SIGNAL_REPORT_UPDATED)
+                await asyncio.sleep(60)
+                verdict = await self._async_verify_update(res["key"], rescan=False)
+                done.append(upd["title"])
+                if verdict == "régression":
+                    stopped = upd["title"]
+                    break
+        finally:
+            self._bulk_running = False
+            self.busy = None
+        lines = []
+        if done:
+            lines.append("Installé et vérifié : " + ", ".join(done) + ".")
+        if restart:
+            lines.append("Installé, redémarrage nécessaire : " + ", ".join(restart) + ". Majordome vérifiera au redémarrage.")
         if failed:
-            msg += f" Échec : {', '.join(failed)}."
-        return {"ok": not failed, "message": msg}
+            lines.append("Échec : " + ", ".join(failed) + ".")
+        if stopped:
+            lines.append(f"⚠️ Arrêt après {stopped} : un problème a été détecté, les mises à jour suivantes n'ont pas été installées.")
+        await self.async_notify("Mises à jour terminées", " ".join(lines) or "Rien n'a été installé.", "majordome_bulk_update")
+        await self.async_scan()
+
+    def auto_update_policies(self) -> dict[str, str]:
+        """Règles de mise à jour automatique par entité : off / patch / safe."""
+        return dict(self.data.get("auto_update", {}))
 
     async def _async_maybe_auto_patch(self) -> None:
-        if not self.opt(CONF_AUTO_PATCH, DEFAULT_AUTO_PATCH):
-            return
         hour = dt_util.now().hour
         if not 3 <= hour < 5:
             return
         today = dt_util.now().date().isoformat()
-        if self.data.get("last_auto_patch") == today:
+        if self.data.get("last_auto_patch") == today or self._bulk_running:
+            return
+        policies = self.auto_update_policies()
+        global_patch = self.opt(CONF_AUTO_PATCH, DEFAULT_AUTO_PATCH)
+        items = []
+        for u in self.report.get("updates", []):
+            policy = policies.get(u["entity_id"])
+            if policy is None and global_patch and u["source"] in ("hacs", "addon"):
+                policy = "patch"
+            if not u["can_install"]:
+                continue
+            if policy == "patch" and u["risk"] == RISK_LOW:
+                items.append(u)
+            elif policy == "safe" and u["risk"] in (RISK_LOW, RISK_MEDIUM):
+                items.append(u)
+        if not items:
             return
         self.data["last_auto_patch"] = today
-        safe = [
-            u for u in self.report.get("updates", [])
-            if u["risk"] == RISK_LOW and u["can_install"] and u["source"] in ("hacs", "addon")
-        ][:3]
-        for upd in safe:
-            await self.async_safe_update(upd["entity_id"])
+        self.async_save_delayed()
+        items.sort(key=lambda u: u["source"] in ("core", "os", "supervisor"))
+        await self._async_bulk_update(items)
 
     # --------------------------------------------------------------- actions
-    async def async_action(self, name: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def async_action(self, name: str, params: dict[str, Any], _scan: bool = True) -> dict[str, Any]:
         """Exécute une action demandée depuis le panneau (toujours confirmée côté UI)."""
         hass = self.hass
         if name == "rescan":
@@ -445,7 +549,19 @@ class Majordome:
         if name == "update":
             return await self.async_safe_update(params["entity_id"])
         if name == "update_all_safe":
-            return await self.async_update_all_safe()
+            return await self.async_update_all_safe(params.get("level", "low"))
+        if name == "fix_all":
+            return await self.async_fix_all(params.get("ids", []))
+        if name == "set_auto_update":
+            policies = self.data.setdefault("auto_update", {})
+            for entity_id, policy in (params.get("policies") or {}).items():
+                if policy in ("patch", "safe"):
+                    policies[entity_id] = policy
+                else:
+                    policies.pop(entity_id, None)
+            self.async_save_delayed()
+            count = len(policies)
+            return {"ok": True, "message": f"Règles enregistrées : {count} élément(s) en mise à jour automatique (la nuit, entre 3 h et 5 h)."}
         if name == "rollback":
             await hass.services.async_call(
                 "update", "install", {"entity_id": params["entity_id"], "version": params["version"]}, blocking=True
@@ -470,6 +586,20 @@ class Majordome:
         elif name == "unignore_all":
             self.data["ignored"] = []
             self.async_save_delayed()
+        elif name in ("disable_entity", "disable_entities"):
+            reg = er.async_get(hass)
+            ids = params.get("entity_ids") or [params.get("entity_id")]
+            count = 0
+            for entity_id in ids:
+                if entity_id and reg.async_get(entity_id):
+                    reg.async_update_entity(entity_id, disabled_by=er.RegistryEntryDisabler.USER)
+                    count += 1
+            if not _scan:
+                return {"ok": True, "message": f"{count} entité(s) désactivée(s)."}
+            await self.async_scan()
+            return {"ok": True, "message": f"{count} entité(s) désactivée(s). Réactivables dans Paramètres > Entités."}
+        elif name == "delete_automation":
+            return await self._async_delete_automation(params.get("entity_id"), params.get("config_id"))
         elif name == "z2m_ping":
             await self.zigbee.async_ping(params["device"])
             return {"ok": True, "message": f"Demande envoyée à {params['device']}."}
@@ -564,5 +694,62 @@ class Majordome:
             return {"ok": True, "message": "Redémarrage de Home Assistant…"}
         else:
             return {"ok": False, "message": f"Action inconnue : {name}"}
-        await self.async_scan()
+        if _scan:
+            await self.async_scan()
         return {"ok": True, "message": "C'est fait."}
+
+    async def async_fix_all(self, ids: list[str]) -> dict[str, Any]:
+        """Applique la correction automatique de chaque problème demandé (désactive, ne supprime jamais)."""
+        wanted = set(ids)
+        todo = [i for i in self.report.get("issues", []) if i["id"] in wanted and i.get("autofix")]
+        # Ce qui redémarre Home Assistant passe en dernier
+        todo.sort(key=lambda i: i["autofix"]["action"] in ("unban_local",))
+        ok, ko = [], []
+        seen: set[str] = set()
+        for i in todo:
+            fix = i["autofix"]
+            sig = fix["action"] + repr(sorted((fix.get("params") or {}).items(), key=str))
+            if sig in seen:
+                continue
+            seen.add(sig)
+            try:
+                res = await self.async_action(fix["action"], fix.get("params") or {}, _scan=False)
+                (ok if res.get("ok", True) else ko).append(i["title"])
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Correction de « %s » impossible : %s", i["title"], err)
+                ko.append(i["title"])
+        await self.async_scan()
+        msg = f"{len(ok)} correction(s) appliquée(s)."
+        if ko:
+            msg += f" Échec : {', '.join(ko)}."
+        return {"ok": not ko, "message": msg}
+
+    async def _async_delete_automation(self, entity_id: str | None, config_id: str | None) -> dict[str, Any]:
+        """Supprime définitivement une automatisation de automations.yaml (confirmé côté UI)."""
+        hass = self.hass
+        if not config_id:
+            return {"ok": False, "message": "Cette automatisation n'est pas modifiable depuis l'interface (définie en YAML à la main)."}
+        from homeassistant.util.file import write_utf8_file_atomic  # noqa: PLC0415
+        from homeassistant.util.yaml import dump, load_yaml  # noqa: PLC0415
+
+        path = hass.config.path("automations.yaml")
+
+        def _delete() -> bool:
+            data = load_yaml(path) or []
+            if not isinstance(data, list):
+                return False
+            kept = [a for a in data if str((a or {}).get("id")) != str(config_id)]
+            if len(kept) == len(data):
+                return False
+            write_utf8_file_atomic(path, dump(kept))
+            return True
+
+        removed = await hass.async_add_executor_job(_delete)
+        if not removed:
+            return {"ok": False, "message": "Automatisation introuvable dans automations.yaml."}
+        await hass.services.async_call("automation", "reload", {}, blocking=True)
+        reg = er.async_get(hass)
+        if entity_id and reg.async_get(entity_id):
+            reg.async_remove(entity_id)
+        await self.async_scan()
+        return {"ok": True, "message": "Automatisation supprimée."}
