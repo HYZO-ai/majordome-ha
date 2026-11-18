@@ -1,0 +1,25 @@
+{
+  "domain": "majordome",
+  "name": "Majordome",
+  "after_dependencies": [
+    "backup",
+    "conversation",
+    "hassio",
+    "mqtt",
+    "notify",
+    "persistent_notification",
+    "recorder",
+    "repairs",
+    "zha"
+  ],
+  "codeowners": ["@HYZO-ai"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "panel_custom", "websocket_api"],
+  "documentation": "https://github.com/HYZO-ai/majordome-ha",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/HYZO-ai/majordome-ha/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.1"
+}

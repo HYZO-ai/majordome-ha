@@ -1,0 +1,1 @@
+"""Analyseurs de Majordome."""

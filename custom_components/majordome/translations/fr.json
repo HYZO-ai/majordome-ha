@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Majordome",
+        "description": "Majordome est un assistant de maintenance 100 % local : score de santé, mises à jour sécurisées, analyse du journal, chien de garde Zigbee et optimisation. Aucune IA externe, aucun compte."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Majordome est déjà configuré."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Réglages de Majordome",
+        "data": {
+          "scan_interval": "Intervalle d'analyse (minutes)",
+          "zigbee_watchdog": "Chien de garde Zigbee (renvoie les commandes perdues)",
+          "auto_patch": "Installer automatiquement les correctifs sans risque la nuit (3 h – 5 h)",
+          "z2m_base_topic": "Topic MQTT de base de Zigbee2MQTT",
+          "notify_service": "Service de notification en plus (ex. téléphone)"
+        }
+      }
+    }
+  }
+}
